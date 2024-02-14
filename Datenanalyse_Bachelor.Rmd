@@ -1,0 +1,1572 @@
+---
+title: "Datenanalyse Bachelor"
+author: "Dragan Jovanovic"
+date: "24 8 2022"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r, echo=FALSE}
+library(mosaic)
+library(rlang)
+```
+
+```{r}
+library(readr)
+DatensatzAktuell1 <- read_delim("Datensatzaktuell1.csv", #ROhdatensatz einlesen
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+```
+
+```{r}
+summary(DatensatzAktuell1)
+```
+
+
+if (!require("pacman")) install.packages("pacman") 
+
+
+
+p_load(
+        tidyverse
+       ,haven
+       ,psych
+       ,labelled
+       ,corx
+       ,digest
+       ,lavaan
+       ,lmerTest
+       ,GPArotation
+       ,lavaanPlot
+       ,corrr
+       ,lmerTest,
+       mosaic,
+       apa,
+       apaTables,
+       dplyr,
+       apaText,
+       tidyr,
+       ggplot2,
+       car,
+       psychometric,
+       MAAS)
+
+
+Nicht benötigte Spalten  aus Rohdatensatz entfernen.
+
+```{r}
+daten <- DatensatzAktuell1 #Umbennen des Datensatzes in daten
+daten[,1:6] <- list(NULL)
+daten[,117:165] <- list(NULL)
+```
+ 
+```{r}
+head(daten)
+```
+ 
+# 1 Deskriptivstatistik der soziodemographiscen Variabeln#
+ 
+Soziodemographische Variablen umbennen.
+
+```{r}
+names(daten)[names(daten) == 'SD01'] <- 'Geschlecht'
+
+daten$Geschlecht[daten$Geschlecht == "1"] <- "männlich" # Beobachtungen den jeweiligen Geschlechtern zuweisen
+daten$Geschlecht[daten$Geschlecht == "2"] <- "weiblich" # Beobachtungen den jeweiligen Geschlechtern zuweisen
+daten$Geschlecht[daten$Geschlecht == "3"] <- "divers"   # Beobachtungen den jeweiligen Geschlechtern zuweisen
+
+names(daten)[names(daten) == 'SD02_01'] <- 'Alter'
+names(daten)[names(daten) == 'SD03_01'] <- 'DDB' # Dauer der Betriebszugehörigket
+```
+ 
+## Verteilung von Geschlecht 
+ 
+```{r}
+bargraph (~Geschlecht, daten)
+tally(~Geschlecht, daten)
+tally(~Geschlecht, format = "percent" ,daten)
+
+```
+ 
+Geschlecht Divers zu verlässigen wegen N = 4
+ 
+```{r}
+daten <- daten[daten$Geschlecht !='divers',] # Divers aus Datensatz entfernen
+```
+ 
+```{r}
+bargraph (~Geschlecht, daten)
+tally(~Geschlecht, daten)
+tally(~Geschlecht, format = "percent" ,daten)
+```
+ 
+## Verteilung von Alter 
+
+```{r}
+favstats(daten$Alter)
+```
+
+```{r}
+bwplot(daten$Alter)
+```
+```{r}
+histogram(daten$Alter)
+```
+
+ 
+## Verteilung von Dauer der Betriebszgehörigkeit
+
+```{r}
+favstats(daten$`DDB`)
+```
+
+```{r}
+bwplot(daten$`DDB`)
+```
+ 
+```{r}
+histogram(daten$`DDB`)
+```
+ 
+# 2 Skalenkonstruktion 
+
+## 2.1 Dunkle Triade 
+
+Subskala Unsentimentaliät von MA (UNMA)
+
+```{r}
+daten$UNMA <- rowMeans(subset(daten, select = c(D02, D08, D26, D39, D49)))
+```
+
+Subkala Skepsis von MA (SKMA)
+
+```{r}
+daten$SKMA <- rowMeans(subset(daten, select = c(D24, D28, D43, D45, D57)))
+```
+
+Subkala Durchsetzungsglaube von MA (DUMA)
+
+```{r}
+daten$DUMA <- rowMeans(subset(daten, select = c(D06, D20, D22, D38, D42, D54, D55)))
+
+```
+
+Konstrukt MA insgesamt
+
+```{r}
+daten$MA <- rowMeans(subset(daten, select = c(UNMA, SKMA, DUMA)))
+inspect(daten$MA)
+```
+
+Subskala Führungsanspruch von NA (FUNA)
+
+```{r}
+daten$FUNA <- rowMeans(subset(daten, select = c(D01, D15, D17, D25, D40, D53, D56)))
+
+```
+
+Subskala Überzeugungsglaube von NA (ZENA)
+
+```{r}
+daten$ZENA <- rowMeans(subset(daten, select = c(D07, D11, D30, D31, D36, D46, D47, D48, D60)))
+
+```
+
+Subskala Autoritätsbedürfnis von NA (AUNA)
+
+```{r}
+daten$AUNA <- rowMeans(subset(daten, select = c(D13, D16, D21, D41)))
+
+```
+
+Subskala Risikofreude von NA (RINA)
+
+```{r}
+daten$RINA <- rowMeans(subset(daten, select = c(D12, D27, D51)))
+
+```
+
+Subskala Überlegenheitsgefühl von NA (LENA)
+
+```{r}
+daten$LENA <- rowMeans(subset(daten, select = c(D04, D10, D18, D23, D32, D35, D50, D59)))
+
+```
+
+Konstrukt NA (NAR) insgesamt. NAR musste aus syntaxgründen so gewählt werden.
+
+```{r}
+daten$NAR <- rowMeans(subset(daten, select = c(FUNA, ZENA, AUNA, RINA, LENA)))
+
+```
+
+Subskala Flexibilität von Psychopathie (FLPP)
+
+```{r}
+daten$FLPP <- rowMeans(subset(daten, select = c(D03, D09, D19, D34, D44)))
+
+```
+
+Subskala Impulsivität von Psychopathie (IMPP)
+
+```{r}
+daten$IMPP <- rowMeans(subset(daten, select = c(D05, D33, D37)))
+
+```
+
+Subskala Beschönigung von Psychopathie (BEPP)
+
+```{r}
+daten$BEPP <- rowMeans(subset(daten, select = c(D14, D29, D52, D58)))
+
+```
+
+Konstrukt Psychopathie (PP) insgesamt
+
+```{r}
+daten$PP <- rowMeans(subset(daten, select = c(FLPP, IMPP, BEPP)))
+
+```
+
+Konsrukt Dunkle Triade insgesamt
+
+```{r}
+daten$DT <- rowMeans(subset(daten, select = c(MA, NAR, PP)))
+```
+ 
+## 2.2 OCB ##
+
+Subskala OCB-Hilfsbereitschaft bilden
+
+```{r}
+daten$OCBH<- rowMeans(subset(daten, select = c(OC01_01, OC01_05, OC01_09, OC01_13, OC01_17)))
+```
+
+Subskala OCB-Gewissenhaftigkeit 
+ 
+```{r}
+daten$OCBG <- rowMeans(subset(daten, select = c(OC01_02, OC01_06, OC01_10, OC01_14, OC01_18)))
+```
+ 
+Subskala OCB-Unkompliziertheit
+
+```{r}
+daten$OCBU <- rowMeans(subset(daten, select = c(OC01_03, OC01_07, OC01_11, OC01_15, OC01_19)))
+```
+
+Subskala OCB-Eigeninitative 
+
+```{r}
+daten$OCBE <- rowMeans(subset(daten, select = c(OC01_04, OC01_08, OC01_12, OC01_16, OC01_20)))
+```
+
+Konstrukt OCB insgesamt
+
+```{r}
+daten$OCB <- rowMeans(subset(daten, select = c(OCBH, OCBG, OCBU, OCBE)))
+```
+
+## 2.3 Soziale Kompetenzen
+
+Subskala soziale Orientierung
+
+```{r}
+daten$SKSO <- rowMeans(subset(daten, select = c(I1, I5, I9, I14, I18, I21, I23, I27, I31)))
+```
+
+Subskala Offensivität
+
+```{r}
+daten$SKO <- rowMeans(subset(daten, select = c(I2, I6, I10, I15, I19, I24, I28, I32)))
+
+```
+
+Subskala Selbststeuerung
+
+```{r}
+daten$SKSS <- rowMeans(subset(daten, select = c(I3, I7, I11, I16, I12, I20, I24, I25, I33)))
+```
+
+Subskala Reflexibilität
+
+```{r}
+daten$SKR <- rowMeans(subset(daten, select = c(I4, I8, I13, I17, I22, I26, I30, I25)))
+
+```
+
+Konstrukt soziale Kompetenzen insgesamt
+
+```{r}
+daten$SK <- rowMeans(subset(daten, select = c(SKSO, SKO, SKSS,SKR)))
+```
+
+# 3 Reliabilitäten und Trennschärfe der Konstrukte 
+
+## 3.1 MA ##
+
+Trennschärfeanalyse
+
+rit unter .3 (Döring & Bortz, 2016, S.478) -> eliminieren
+
+
+```{r}
+library(psychometric)
+```
+
+Trennschärfenalyse Subskala Unsentimentalität
+
+```{r}
+TS_UNMA <- as.data.frame(cbind(daten$D02, daten$D08, daten$D26, daten$D39, daten$D49))
+tab <- item.exam(TS_UNMA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Unsentimentalität
+
+```{r}
+psychometric::alpha(TS_UNMA)
+```
+Trennschärfenalyse Subskala Skepsis
+
+```{r}
+TS_SKMA <- as.data.frame(cbind(daten$D24, daten$D28, daten$D43, daten$D45, daten$D57))
+tab <- item.exam(TS_SKMA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Skepsis:
+
+```{r}
+psychometric::alpha(TS_SKMA)
+```
+
+Trennschärfe Subskala Durchsetzungsglaube
+
+```{r}
+TS_DUMA <- as.data.frame(cbind(daten$dD06, daten$D20, daten$D22, daten$D38, daten$D42, daten$D54, daten$D55))
+tab <- item.exam(TS_DUMA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Durchsetzungsglaube
+
+```{r}
+psychometric::alpha(TS_DUMA)
+```
+## Cronbach alpha für MA
+
+```{r}
+MAalpha <- as.data.frame(cbind(daten$dD06, daten$D20, daten$D22, daten$D38, daten$D42, daten$D54, daten$D55, daten$D24, daten$D28, daten$D43, daten$D45, daten$D57, daten$D02, daten$D08, daten$D26, daten$D39, daten$D49))
+tab <- item.exam(MAalpha, discrim = TRUE)
+tab
+```
+```{r}
+psychometric::alpha(MAalpha) # Cronbach alpha für MA
+```
+
+## 3.2 NA ##
+
+Trennschärfe Subskala Führungsanspruch
+
+```{r}
+TS_FUNA <- as.data.frame(cbind(daten$D01, daten$D15, daten$D17, daten$D25, daten$D40, daten$D53, daten$D56))
+tab <- item.exam(TS_FUNA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Führungsanspruch
+
+```{r}
+psychometric::alpha(TS_FUNA)
+```
+
+
+
+Trennschärfe Subskala Überzeugungsglaube
+
+```{r}
+TS_ZENA<- as.data.frame(cbind(daten$D07, daten$D11, daten$D30, daten$D31, daten$D36, daten$D46, daten$D47, daten$D48, daten$D60))
+tab <- item.exam(TS_ZENA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Überzeugungsglaube
+
+```{r}
+psychometric::alpha(TS_ZENA)
+```
+
+Trennschärfe Subskala Autoritätsbedürfnis
+
+```{r}
+TS_AUNA <- as.data.frame(cbind(daten$D13, daten$D16, daten$D21, daten$D41))
+tab <- item.exam(TS_AUNA, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Autoritätsbedürfnis
+
+```{r}
+psychometric::alpha(TS_AUNA)
+```
+
+Trennschärfe Subskala Risikofreude
+
+```{r}
+TS_RINA <- as.data.frame(cbind(daten$D12, daten$D27, daten$D51))
+tab <- item.exam(TS_RINA, discrim = TRUE)
+tab
+```
+Cronbach alpha Risikofreude
+
+```{r}
+psychometric::alpha(TS_RINA)
+```
+
+Trennschärfe Subskala Überlegenheitsgefühl
+
+```{r}
+TS_LENA <- as.data.frame(cbind(daten$D04, daten$D10, daten$D18, daten$D23, daten$D32, daten$D35, daten$D50, daten$D59))
+tab <- item.exam(TS_LENA, discrim = TRUE)
+tab
+```
+Cronbach alpha Überlegenheitsgefühl
+
+```{r}
+psychometric::alpha(TS_LENA)
+```
+## Cronbach alpha NAR ##
+
+```{r}
+NARalpha <- as.data.frame(cbind(daten$D01, daten$D15, daten$D17, daten$D25, daten$D40, daten$D53, daten$D56, daten$D07, daten$D11, daten$D30, daten$D31, daten$D36, daten$D46, daten$D47, daten$D48, daten$D60, daten$D13, daten$D16, daten$D21, daten$D41, daten$D12, daten$D27, daten$D51, daten$D04, daten$D10, daten$D18, daten$D23, daten$D32, daten$D35, daten$D50, daten$D59))
+tab <- item.exam(TS_LENA, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(NARalpha)
+```
+
+
+## 3.3 PP ##
+
+Trennschärfe Subskala Flexibilität
+
+```{r}
+TS_FLPP <- as.data.frame(cbind(daten$D03, daten$D09, daten$D19, daten$D34, daten$D44))
+tab <- item.exam(TS_FLPP, discrim = TRUE)
+tab
+```
+
+
+Cronbach alpha Flexibilität
+
+```{r}
+psychometric::alpha(TS_FLPP)
+```
+
+
+Trennschärfe Subskala Impulsivität
+
+```{r}
+TS_IMPP <- as.data.frame(cbind(daten$D05, daten$D33, daten$D37))
+tab <- item.exam(TS_IMPP, discrim = TRUE)
+tab
+```
+Cronbach alpha Impulsivität
+
+```{r}
+psychometric::alpha(TS_IMPP)
+```
+
+Trennschärfe Subskala Beschönigung
+
+```{r}
+TS_BEPP <- as.data.frame(cbind(daten$D14, daten$D29, daten$D52, daten$D58))
+tab <- item.exam(TS_BEPP, discrim = TRUE)
+tab
+```
+
+Cronbach alpha Beschönigung
+
+```{r}
+psychometric::alpha(TS_BEPP)
+```
+
+## Cronbach alpha PP 
+
+```{r}
+PPalpha <- as.data.frame(cbind(daten$D03, daten$D09, daten$D19, daten$D34, daten$D44, daten$D05, daten$D33, daten$D37, daten$D14, daten$D29, daten$D52, daten$D58))
+tab <- item.exam(PPalpha, discrim = TRUE)
+tab#
+```
+
+```{r}
+psychometric::alpha(PPalpha)
+```
+## 3.4 Cronbach Alpha OCB 
+
+## OCB
+```{r}
+OCBalpha <- as.data.frame(cbind(daten$OC01_01, daten$OC01_05, daten$OC01_09, daten$OC01_13, daten$OC01_17, 
+                                daten$OC01_02, daten$OC01_06, daten$OC01_10, daten$OC01_14, daten$OC01_18, 
+                                daten$OC01_03, daten$OC01_07, daten$OC01_11, daten$OC01_15, daten$OC01_19, 
+                                daten$OC01_04, daten$OC01_08, daten$OC01_12, daten$OC01_16, daten$OC01_20))
+tab <- item.exam(OCBalpha, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(OCBalpha)
+```
+## Cronbach alpha OCBH
+
+```{r}
+OCBHalpha <- as.data.frame(cbind(daten$OC01_01, daten$OC01_05, daten$OC01_09, daten$OC01_13, daten$OC01_17))
+tab <- item.exam(OCBHalpha, discrim = TRUE)
+tab
+```
+
+```{r}
+
+psychometric::alpha(OCBHalpha)
+```
+
+## OCBG 
+
+```{r}
+OCBGalpha <- as.data.frame(cbind(daten$OC01_02, daten$OC01_06, daten$OC01_10, daten$OC01_14, daten$OC01_18))
+tab <- item.exam(OCBGalpha, discrim = TRUE)
+tab
+```
+
+
+
+```{r}
+psychometric::alpha(OCBGalpha) 
+```
+Item OC01_18 eliminieren da rit = .2
+
+```{r}
+OCBGalphaNEU <- as.data.frame(cbind(daten$OC01_02, daten$OC01_06, daten$OC01_10, daten$OC01_14))
+tab <- item.exam(OCBGalphaNEU, discrim = TRUE)
+tab
+```
+```{r}
+psychometric::alpha(OCBGalphaNEU)
+```
+Reliabilität von OCBG erhöht sich, wenn Item OC01_18 elimiminiert wird.
+
+
+```{r}
+OCBGalpha <- as.data.frame(cbind(daten$OC01_02, daten$OC01_06, daten$OC01_10, daten$OC01_14))
+tab <- item.exam(OCBGalpha, discrim = TRUE)
+tab
+```
+
+
+## OCBU
+
+```{r}
+OCBUalpha <- as.data.frame(cbind(daten$OC01_03, daten$OC01_07, daten$OC01_11, daten$OC01_15, daten$OC01_19))
+tab <- item.exam(OCBUalpha, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(OCBUalpha)
+```
+
+## OCBE
+
+```{r}
+OCBEalpha <- as.data.frame(cbind(daten$OC01_04, daten$OC01_08, daten$OC01_12, daten$OC01_16, daten$OC01_20))
+tab <- item.exam(OCBEalpha, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(OCBEalpha)
+```
+## OCB neue Konstruktion ohne OC01_18
+
+```{r}
+daten$OCBG <- rowMeans(subset(daten, select = c(OC01_02, OC01_06, OC01_10, OC01_14)))
+```
+
+```{r}
+daten$OCB <- rowMeans(subset(daten, select = c(OCBH, OCBG, OCBU, OCBE)))
+```
+
+Cronbach alpha OCB neu berechnen
+
+```{r}
+psychometric::alpha(OCBalpha)
+```
+## Cronbach alpha SK 
+
+# Soziale Orientierung SO
+
+```{r}
+
+TS_SOSK <- as.data.frame(cbind(daten$I1, daten$I5, daten$I9, daten$I14, daten$I18, daten$I21, daten$I23, daten$I27, daten$I31)) #Trennschärfe
+tab <- item.exam(TS_SOSK, discrim = TRUE)
+tab
+```
+
+
+```{r}
+psychometric::alpha(TS_SOSK) #
+```
+# Offensitivät (OF)
+
+```{r}
+TS_OF <- as.data.frame(cbind(daten$I2, daten$I6, daten$I10, daten$I15, daten$I19, daten$I24, daten$I28, daten$I32)) #Trennschärfe
+tab <- item.exam(TS_OF, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(TS_OF)
+```
+
+# Selbststeuerung (SS)
+
+```{r}
+TS_SS <- as.data.frame(cbind(daten$dI3, daten$I7, daten$I11, daten$I16, daten$I12, daten$I20, daten$I24, daten$I25, daten$I33)) #Trennschärfe
+tab <- item.exam(TS_SS, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(TS_SS)
+```
+# Reflexibilität (RE)
+
+```{r}
+TS_RE <- as.data.frame(cbind(daten$I4, daten$I8, daten$I13, daten$I17, daten$I22, daten$I26, daten$I30, daten$I25)) #Trennschärfe
+tab <- item.exam(TS_RE, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(TS_RE)
+```
+
+Items unter rit = 3 eliminieren.
+
+```{r}
+TS_RE <- as.data.frame(cbind(daten$I4, daten$I8, daten$I13, daten$I22)) #Trennschärfe
+tab <- item.exam(TS_RE, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(TS_RE)
+```
+
+# SK Cronbach alpha
+
+```{r}
+SKalpha <- as.data.frame(cbind(daten$I4, daten$I8, daten$I13, daten$I22, daten$I4, daten$I8, daten$I13, daten$I22, daten$dI3, daten$I7, daten$I11, daten$I16, daten$I12, daten$I20, daten$I24, daten$I25, daten$I33, daten$I2, daten$I6, daten$I10, daten$I15, daten$I19, daten$I24, daten$I28, daten$I32, daten$I1, daten$I5, daten$I9, daten$I14, daten$I18, daten$I21, daten$I23, daten$I27, daten$I31))
+tab <- item.exam(OCBEalpha, discrim = TRUE)
+tab
+```
+
+```{r}
+psychometric::alpha(SKalpha)
+```
+## Interkorrelation der Skalen
+
+```{r}
+daten_interkor <- daten[, c("MA", "NAR", "PP", "SK", "OCB")]
+```
+
+```{r}
+library(apaTables)
+apa.cor.table(daten_interkor,
+filename = "Table1Interkor.doc",
+table.number = NA,
+show.conf.interval = TRUE,
+show.sig.stars = TRUE,
+landscape = TRUE)
+
+```
+
+## Normalverteilung der Variablen
+
+Nach Aldor-Noiman, Brown, Stine, Buja & Rolke, 2013.
+
+## Verteilung von MA 
+
+```{r}
+shapiro.test(daten$MA)
+```
+
+Normalverteilt, da p > .05 ist.
+
+
+```{r}
+qqnorm(scale(daten$MA))
+qqline(scale(daten$MA))
+```
+Nah an Gerade -> normalverteilt 
+
+```{r}
+hist(daten$MA)
+```
+-> normalverteilt 
+
+## Verteilung von NAR 
+
+```{r}
+shapiro.test(daten$NAR)
+```
+Normalverteilt, da p > .05
+
+```{r}
+qqnorm(scale(daten$NAR))
+qqline(scale(daten$NAR))
+```
+
+Normalverteilt, da nah an Gerade.
+
+```{r}
+hist(daten$NAR)
+```
+
+## Verteilung von PP
+
+```{r}
+shapiro.test(daten$PP)
+```
+Normalverteilt, da p > .05
+
+```{r}
+qqnorm(scale(daten$NAR))
+qqline(scale(daten$NAR))
+```
+
+```{r}
+hist(daten$NAR)
+```
+## Verteilung von OCB 
+
+```{r}
+shapiro.test(daten$OCB)
+```
+nicht normalverteilt, da p < .05 ist.
+
+```{r}
+qqnorm(scale(daten$OCB))
+qqline(scale(daten$OCB))
+```
+```{r}
+hist(daten$OCB)
+```
+## Verteilung von SK
+
+```{r}
+shapiro.test(daten$SK)
+```
+
+```{r}
+qqnorm(scale(daten$SK))
+qqline(scale(daten$SK))
+```
+
+```{r}
+hist(daten$SK)
+```
+
+Normalverteilt, da p > .05
+
+## Interpretation Normalverteilung
+
+Normalverteilung ist bei allen Variablen gegeben bis auf OCB. Jedoch kannn wegen zentralem Grenzwertsatz angenommen werden, dass Stichprobe normalverteilt ist bei N > 30 und bei wenigen Ausreißern.
+
+## Skewness und Kurtosis
+
+```{r}
+library(moments)
+```
+
+```{r}
+skewness(daten$OCB)
+
+```
+
+
+```{r}
+kurtosis(daten$OCB)
+```
+```{r}
+jarque.test(daten$OCB)
+```
+Alternativhypothese bestätigt. Nicht-Normalverteilung vorhanden bei OCB.
+
+## 
+
+# 4 Inferenzstatisitk 
+
+```{r}
+library(psych)
+```
+
+## 4.1 H1
+
+## H1a
+
+## Kendall
+
+
+```{r}
+cor.test(daten$OCB, daten$MA, method = "kendall", alternative="greater") # nach Kendall, positiver Zusammenhang
+```
+
+Alternative Rechnung MA ~ OCB (negativ)
+
+```{r}
+cor.test(daten$OCB, daten$MA, method = "kendall", alternative="less") # nach Kendall, positiver Zusammenhang
+
+```
+
+## Pearson
+
+```{r}
+cor.test(daten$OCB, daten$MA, method = "pearson", alternative="greater") # nach Kendall, positiver Zusammenhang
+
+```
+
+```{r}
+cor.test(daten$OCB, daten$MA, method = "pearson", alternative="less") # nach Kendall, positiver Zusammenhang
+
+```
+
+```{r}
+plotModel(lm(OCB ~ MA, data=daten)) + ggtitle("Zusammenhang zwischen MA und OCB")
+```
+
+H1a kann nicht angenommen werden.
+
+## H1b
+
+## Kendall
+
+
+```{r}
+cor.test(daten$OCB, daten$NAR, method = "kendall", alternative="two.sided") #zweiseitiger Test
+```
+## Pearson
+
+```{r}
+cor.test(daten$OCB, daten$NAR, method = "kendall", alternative="two.sided") #zweiseitiger Test
+
+```
+
+```{r}
+plotModel(lm(OCB ~NAR, data=daten)) + ggtitle("Zusammenhang zwischen NA und OCB")
+```
+
+H1b kann angenommen werden.
+
+## H1c
+
+## Kendall
+
+```{r}
+cor.test(daten$OCB, daten$PP, method = "kendall", alternative="less") #einseitiger Test, negativer Zusammnehang
+```
+
+```{r}
+cor.test(daten$OCB, daten$PP, method = "pearson", alternative="less") #einseitiger Test, negativer Zusammnehang
+
+```
+
+H1c kann angenommen werden, es besteht ein negativer Zusammenhang zwischen PP und OCB mit einem moderaten negativen Zusammenhang mit r = .-26
+
+```{r}
+plotModel(lm(OCB ~PP, data=daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+```
+
+# 4.2 H2 
+
+```{r, echo=FALSE}
+library(processR)
+library(processx)
+```
+
+## 2a: Das Alter moderiert den Zusammenhang zwischen MA und OCB. Mit zunehmenden Alter wird der Zusammenhang schwächer. 
+
+### Linearität
+
+H2a prüft Zusammenhang zwischen MA und OCB. Alter dient als Moderator.
+
+```{r}
+plotModel(lm(OCB ~ MA, data = daten)) + ggtitle("Zusammenhang zwischen MA und OCB")
+```
+
+Linearität ist vorhanden. 
+
+### Zusammenhang von Alter und OCB
+
+```{r}
+plotModel(lm(OCB ~ Alter, data = daten)) + ggtitle("Zusammenhang zwischen Alter und OCB")
+```
+
+Linearität ist vorhanden.
+
+### Test H2a
+
+Prüfung von H2a mit Regressionsanalyse:
+
+```{r}
+mod_MAOCBAlter <- lm(OCB~MA + MA*Alter, data = daten) 
+```
+
+```{r}
+library(interactions)
+```
+
+```{r}
+interact_plot(model = mod_MAOCBAlter, pred = MA, modx = Alter)
+```
+
+Moderation MA OCB Alter nach process
+
+```{r}
+library(processR)
+library(processx)
+```
+
+### Test H2a nach Hayes MA und OCB
+
+```{r}
+process(data = daten, y = "OCB", x = "MA", w = "Alter", model = 1, modelbt = 1, seed = 5000, center = 2)
+```
+
+## Modelle extrahieren
+
+
+
+H2a kann nicht angenommen werden, wegen p Wert = .63. 
+
+## H2a Gauß-Markow/ Hayes Annahmevoraussetzungen
+
+### Normalverteilung der Residuen H2a
+
+```{r}
+hist(residuals(mod_MAOCBAlter))
+```
+Es scheint eine Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H2a
+
+
+H0: Es liegt Homoskedazität vor.
+
+```{r, echo=FALSE}
+library(lmtest)
+```
+
+
+```{r}
+bptest(mod_MAOCBAlter)
+```
+Es liegt hier ein Homoskedaszität der Residuen vor.
+
+
+### Autokorrelation H2a
+
+```{r}
+dwtest(mod_MAOCBAlter)
+```
+
+Keine Autokorrelation vorhanden.
+
+
+#H2b Das Alter moderiert den Zusammenhang zwischen NA und OCB. Mit zunehmenden Alter wird der Zusammenhang schwächer.
+
+```{r}
+process(data = daten, y = "OCB", x = "NAR", w = "Alter", model = 1, modelbt = 1, seed = 50000, center = 2 )
+```
+
+## Linearität 
+
+### Zusammenhang NA und OCB
+
+```{r}
+plotModel(lm(OCB ~ NAR, data = daten)) + ggtitle("Zusammenhang zwischen NA und OCB")
+
+```
+
+Linearität ist vorhanden
+
+```{r}
+plotModel(lm(OCB ~ Alter, data = daten)) + ggtitle("Zusammenhang zwischen Alter und OCB")
+```
+
+
+### Zusammenhang NA und Alter
+
+
+```{r}
+mod_NAROCBAlter <- lm(OCB~NAR +  NAR*Alter, data = daten) 
+summary(mod_NAROCBAlter)
+```
+
+```{r}
+interact_plot(model = mod_NAROCBAlter, pred = NAR, modx = Alter)
+
+```
+
+
+H2b kann nicht angenommen werden, da p = .63 ist.
+
+## H2b Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H2b
+
+```{r}
+hist(residuals(mod_NAROCBAlter))
+```
+Es scheint eine Normalverteilung vorzuliegen.
+
+### Heteroeskedaszität H2b
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_NAROCBAlter)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+### Autokorrelation H2b
+
+```{r}
+dwtest(mod_NAROCBAlter)
+```
+Tabelle erzeugen.
+
+```{r}
+Tabelle2hb <- apa.reg.table(mod_NAROCBAlter,filename = "Tabelle2hb", table.number = 3)
+```
+
+
+# H2c 
+
+```{r}
+process(data = daten, y = "OCB", x = "PP", w = "Alter", model = 1, modelbt = 1, seed = 50000, center = 2 )
+```
+
+## Linearität 
+
+### Zusammenhang PP und OCB
+
+```{r}
+plotModel(lm(OCB ~ PP, data = daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+
+```
+
+```{r}
+plotModel(lm(OCB ~ Alter, data = daten)) + ggtitle("Zusammenhang zwischen Alter und OCB")
+```
+
+
+Linearität ist vorhanden
+
+```{r}
+mod_PPOCBAlter <- lm(OCB~PP +  PP*Alter, data = daten) 
+summary(mod_PPOCBAlter)
+```
+
+```{r}
+interact_plot(model = mod_PPOCBAlter, pred = PP, modx = Alter)
+
+```
+
+
+
+## H2c Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H2c
+
+```{r}
+hist(residuals(mod_PPOCBAlter))
+```
+Es scheint eine leicht rechssteile Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H2c
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_PPOCBAlter)
+```
+
+Es liegt hier ein Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H2c
+
+```{r}
+dwtest(mod_PPOCBAlter)
+```
+Tabelle erzeugen
+
+```{r}
+Tabelle2hcfg <- apa.reg.table(mod_PPOCBAlter,filename = "Tabelle2hcfg", table.number = 4)
+```
+
+
+# H3
+
+## H3a: Das Geschlecht moderiert den Zusammenhang zwischen MA und OCB. Bei Männern ist der Zusammenhang stärker.
+
+```{r}
+process(data = daten2, y = "OCB", x = "MA", w = "Geschlecht", model = 1, modelbt = 1, seed = 50000 )
+
+```
+## Linearität 
+
+### Zusammenhang MA und Geschlecht
+
+```{r}
+plotModel(lm(OCB ~ Geschlecht, data = daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+
+```
+
+Linearität ist vorhanden
+
+### Zusammenhang MA und Geschlecht
+
+```{r}
+plotModel(lm(OCB ~ MA, data = daten)) + ggtitle("Zusammenhang zwischen MA und OCB")
+
+```
+
+
+```{r}
+mod_MAOCBGeschlecht <- lm(OCB~MA +   MA*Geschlecht, data = daten) 
+summary(mod_MAOCBGeschlecht)
+```
+
+```{r}
+interact_plot(model = mod_MAOCBGeschlecht, pred = MA, modx = Geschlecht)
+```
+
+## H3a Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H3a
+
+```{r}
+hist(residuals(mod_MAOCBGeschlecht))
+```
+
+Es scheint eine Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H3a
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_MAOCBGeschlecht)
+```
+
+Es liegt hier ein Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H3a
+
+```{r}
+dwtest(mod_MAOCBGeschlecht)
+```
+
+Keine Autokorrelation vorhanden
+
+```{r}
+daten2 <- daten
+daten2$Geschlecht[daten2$Geschlecht == "männlich"] <- "1" # Beobachtungen den jeweiligen Geschlechtern zuweisen
+daten2$Geschlecht[daten2$Geschlecht == "weiblich"] <- "2" # Beobachtungen den jeweiligen Geschlechtern zuweisen
+daten2$Geschlecht <- as.numeric(daten2$Geschlecht)
+
+```
+
+
+
+
+#H3b Die DDB moderiert den Zusammenhang zwischen NA und OCB. Mit einer zunehmenden DDB wird der Zusammenhang schwächer.
+
+```{r}
+process(data = daten2, y = "OCB", x = "NAR", w = "Geschlecht", model = 1, modelbt = 1, seed = 50000 )
+
+```
+
+## Linearität 
+
+### Zusammenhang NA und Geschlecht
+
+```{r}
+plotModel(lm(OCB ~ Geschlecht, data = daten)) + ggtitle("Zusammenhang zwischen NA und OCB")
+
+```
+
+Linearität ist vorhanden
+
+### Zusammenhang MA und Geschlecht
+
+```{r}
+plotModel(lm(NAR ~ Geschlecht, data = daten)) + ggtitle("Zusammenhang zwischen Geschlecht und Alter")
+
+```
+
+
+```{r}
+mod_NAROCBH <- lm(OCB~NAR + NAR*Geschlecht, data = daten) 
+summary(mod_NAROCBGeschlecht)
+```
+
+```{r}
+interact_plot(model = mod_NAROCBGeschlecht, pred = NAR, modx = Geschlecht)
+```
+
+## H3b Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H3b
+
+```{r}
+hist(residuals(mod_NAROCBGeschlecht))
+```
+
+Es scheint eine Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H3b
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_NAROCBGeschlecht)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H3b
+
+```{r}
+dwtest(mod_NAROCBGeschlecht)
+```
+
+Keine Autokorrelation vorhanden
+
+
+
+## H3cDas Geschlecht moderiert den Zusammenhang zwischen PP und OCB. Bei Männern ist der Zusammenhang stärker.
+
+```{r}
+process(data = daten2, y = "OCB", x = "PP", w = "Geschlecht", model = 1, modelbt = 1, seed = 50000)
+
+```
+
+## Linearität 
+
+Linearität ist vorhanden
+
+### Zusammenhang PP und Geschlecht
+
+```{r}
+plotModel(lm(OCB ~ PP, data = daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+
+```
+### Zusammenhang Geschlecht und OCB
+
+```{r}
+plotModel(lm(OCB ~ PP, data = daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+
+```
+
+
+```{r}
+mod_PPOCBGeschlecht <- lm(OCB~PP + PP*Geschlecht, data = daten) 
+summary(mod_PPOCBGeschlecht)
+```
+
+```{r}
+interact_plot(model = mod_PPOCBGeschlecht, pred = PP, modx = Geschlecht)
+```
+
+## H3c Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+
+
+### Normalverteilung der Residuen H3c
+
+```{r}
+hist(residuals(mod_PPOCBGeschlecht))
+```
+
+Es scheint eine leicht rechtssteile Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H3c
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_PPOCBGeschlecht)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H3c
+
+```{r}
+dwtest(mod_PPOCBGeschlecht)
+```
+
+Keine Autokorrelation vorhanden
+
+
+
+
+## H4a Die DDB moderiert den Zusammenhang zwischen MA und OCB. Mit einer zunehmenden DDB wird der Zusammenhang stärker.
+
+```{r}
+process(data = daten, y = "OCB", x = "MA", w = "DDB", model = 1, modelbt = 1, seed = 50000, center = 2 )
+
+```
+
+## Linearität 
+
+### Zusammenhang DDB und OCB
+
+```{r}
+plotModel(lm(OCB ~ MA, data = daten)) + ggtitle("Zusammenhang zwischen MA und OCB")
+
+```
+
+Linearität ist vorhanden
+
+### Zusammenhang MA und OCB
+
+```{r}
+plotModel(lm(OCB ~ DDB, data = daten)) + ggtitle("Zusammenhang zwischen DDB und OCB")
+
+```
+Linearität ist vorhanden.
+
+```{r}
+mod_MAOCBDDB <- lm(OCB~MA + MA*DDB, data = daten) 
+summary(mod_MAOCBDDB)
+```
+
+
+
+
+```{r}
+interact_plot(model = mod_MAOCBDDB, pred = MA, modx = DDB)
+```
+
+H4a abgelehnt, da p größer ist als .05.
+
+## H4a Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H3c
+
+```{r}
+hist(residuals(mod_MAOCBDDB))
+```
+
+Es scheint eine Normalverteilung vorzuliegen.
+
+### Hetereskedaszität H4a
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_MAOCBDDB)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H4a
+
+```{r}
+dwtest(mod_MAOCBDDB)
+```
+
+
+# H4b: Die DDB moderiert den Zusammenhang zwischen NA und OCB. Mit einer zuneh-menden DDB wird der Zusammenhang schwächer.
+
+```{r}
+process(data = daten, y = "OCB", x = "NAR", w = "DDB", model = 1, modelbt = 1, seed = 50000, center = 2)
+
+```
+
+## Linearität 
+
+### Zusammenhang DDB und NA
+
+```{r}
+plotModel(lm(OCB ~ NAR, data = daten)) + ggtitle("Zusammenhang zwischen NA und OCB")
+
+```
+
+Linearität ist vorhanden
+
+### Zusammenhang DDB und OCB
+
+```{r}
+plotModel(lm(OCB ~ DDB, data = daten)) + ggtitle("Zusammenhang zwischen DDB und OCB")
+
+```
+Linearität ist vorhanden.
+
+```{r}
+mod_NAROCBDDB <- lm(OCB~NAR + NAR*DDB, data = daten) 
+summary(mod_NAROCBDDB)
+```
+
+
+
+```{r}
+interact_plot(model = mod_NAROCBDDB, pred = NAR, modx = DDB)
+```
+
+H4b abgelehnt, da p größer ist als .05.
+
+## H4b Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H4b
+
+```{r}
+hist(residuals(mod_NAROCBDDB))
+```
+
+Es scheint eine Normalverteilung vorzuliegen. Eine leicht linksschiefe Verteilung scheint existent zu sein.
+
+### Hetereskedaszität H4b
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_NAROCBDDB)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H4b
+
+```{r}
+dwtest(mod_NAROCBDDB)
+```
+
+Keine Autokorrelation vorhanden.
+
+H4b abgelehnt, wegen Irrtumswahrscheinlichkeit.
+
+
+# H4c Die DDB moderiert den Zusammenhang zwischen PP und OCB. Mit einer zunehmenden DDB wird der Zusammenhang schwächer.
+
+```{r}
+process(data = daten, y = "OCB", x = "PP", w = "DDB", model = 1, modelbt = 1, seed = 50000, center = 2)
+
+```
+
+## Linearität 
+
+### Zusammenhang DDB und PP
+
+```{r}
+plotModel(lm(OCB ~ PP, data = daten)) + ggtitle("Zusammenhang zwischen PP und OCB")
+
+```
+
+Linearität ist vorhanden
+
+### Zusammenhang DDB und OCB
+
+```{r}
+plotModel(lm(OCB ~ DDB, data = daten)) + ggtitle("Zusammenhang zwischen DDB und OCB")
+
+```
+
+Linearität ist vorhanden.
+
+```{r}
+mod_PPOCBDDB <- lm(OCB~PP + PP*DDB, data = daten) 
+summary(mod_PPOCBDDB)
+```
+
+
+```{r}
+interact_plot(model = mod_PPOCBDDB, pred = PP, modx = DDB)
+```
+
+## H4c Gauß-Markow/ Hayes Anwendungsvoraussetzungen
+
+### Normalverteilung der Residuen H4c
+
+```{r}
+hist(residuals(mod_PPOCBDDB))
+```
+
+Es scheint eine Normalverteilung vorzuliegen. Eine leicht linksschiefe Verteilung scheint existent zu sein.
+
+### Hetereskedaszität H4c
+
+H0: Es liegt Homoskedazität vor.
+
+```{r}
+bptest(mod_PPOCBDDB)
+```
+
+Es liegt hier eine Homoskedaszität der Residuuen vor.
+
+
+### Autokorrelation H4c
+
+```{r}
+dwtest(mod_PPOCBDDB)
+```
+Keine Autokorrelation vorhanden.
+
+H4c abgelehnt.
+
+# H5a SK mediieren den Zusammenhang zwischen MA und OCB.
+
+```{r}
+process(data = daten, y = "OCB", x = "MA", m = "SK", model = 4, modelbt = 1 ,seed = 50000, effsize = 1, stand = 1, hc = 4)
+```
+
+
+# H5b SK mediieren den Zusammenhang zwischen NA und OCB.
+
+```{r}
+process(data = daten, y = "OCB", x = "NAR", m = "SK", model = 4, modelbt = 1 ,seed = 50000, hc = 4, effsize = 1, stand = 1)
+```
+
+#Modelle extrahieren 
+
+# H5c SK mediieren den Zusammenhang zwischen NA und OCB.
+
+```{r}
+process(data = daten, y = "OCB", x = "PP", m = "SK", model = 4, modelbt = 1 ,seed = 50000, hc = 4, effsize = 1, stand = 1)
+```
+
+
+
+
+
